@@ -31,21 +31,21 @@ class FindUnusedDrupalPackagesCommand extends BaseCommand
 
     $output->writeln("<info>Using configuration directory: {$configDirectory}</info>");
 
-    $coreExtensionsFile = $configDirectory . '/core.extensions.yml';
+    $coreExtensionsFile = $configDirectory . '/core.extension.yml';
 
     if (!file_exists($coreExtensionsFile)) {
       echo "Core extensions configuration file not found at {$coreExtensionsFile}.\n";
       return 1;
     }
 
-    // Load core.extensions.yml
+    // Load core.extension.yml
     $coreExtensions = Yaml::parseFile($coreExtensionsFile);
     $enabledModules = $coreExtensions['module'] ?? [];
 
     // Check config_split modules
     $configSplitModules = $this->getConfigSplitModules($configDirectory);
 
-    // Combine modules from core.extensions and config_split
+    // Combine modules from core.extension and config_split
     $allEnabledModules = array_merge($enabledModules, $configSplitModules);
 
     // Get installed Drupal modules via Composer API
@@ -55,7 +55,7 @@ class FindUnusedDrupalPackagesCommand extends BaseCommand
     $missingModules = array_diff($installedModules, array_keys($allEnabledModules));
 
     if (!empty($missingModules)) {
-      echo "The following Drupal modules are not enabled in core.extensions.yml or any config_split:\n";
+      echo "The following Drupal modules are not enabled in core.extension.yml or any config_split:\n";
       foreach ($missingModules as $module) {
         echo "- $module\n";
       }
