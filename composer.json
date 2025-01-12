@@ -4,6 +4,7 @@
   "license": "MIT",
   "require": {
     "composer-plugin-api": "^1.0 || ^2.0",
+    "symfony/yaml": "^6.0 || ^7.0",
     "php": "^8.0"
   },
   "autoload": {
