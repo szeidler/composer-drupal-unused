@@ -8,10 +8,10 @@
   },
   "autoload": {
     "psr-4": {
-      "szeidler\\ComposerDrupalUnusedCLI\\": "src"
+      "szeidler\\ComposerDrupalUnused\\": "src"
     }
   },
   "extra": {
-    "class": "szeidler\\ComposerDrupalUnusedCLI\\Composer\\Plugin"
+    "class": "szeidler\\ComposerDrupalUnused\\Composer\\Plugin"
   }
 }
