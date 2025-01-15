@@ -101,7 +101,7 @@ class ComposerHandler
             $installer = Installer::create($this->io, $this->composer);
             $installer->setUpdate(true)
                 ->setUpdateAllowList([$packageName]) // Restrict updates to the package being removed
-                ->setDevMode(false);
+                ->setDevMode(true);
 
             $status = $installer->run();
 
