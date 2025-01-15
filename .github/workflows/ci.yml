@@ -29,4 +29,4 @@ jobs:
 
       # Run PHPUnit tests
       - name: Run PHPUnit tests
-        run: vendor/bin/phpunit --configuration phpunit.xml
+        run: vendor/bin/phpunit --configuration phpunit.xml.dist
