@@ -7,27 +7,39 @@ use Composer\IO\IOInterface;
 use Composer\Plugin\Capable;
 use Composer\Plugin\PluginInterface;
 
+/**
+ * The Composer Plugin handler.
+ */
 class Plugin implements PluginInterface, Capable
 {
-  public function activate(Composer $composer, IOInterface $io)
-  {
-    $io->write("<info>Drupal module checker plugin activated.</info>");
-  }
+    /**
+     * {@inheritdoc}
+     */
+    public function activate(Composer $composer, IOInterface $io)
+    {
+    }
 
-  public function deactivate(Composer $composer, IOInterface $io)
-  {
-    $io->write("<info>Drupal module checker plugin deactivated.</info>");
-  }
+    /**
+     * {@inheritdoc}
+     */
+    public function deactivate(Composer $composer, IOInterface $io)
+    {
+    }
 
-  public function uninstall(Composer $composer, IOInterface $io)
-  {
-    $io->write("<info>Drupal module checker plugin uninstalled.</info>");
-  }
+    /**
+     * {@inheritdoc}
+     */
+    public function uninstall(Composer $composer, IOInterface $io)
+    {
+    }
 
-  public function getCapabilities()
-  {
-    return [
-      'Composer\Plugin\Capability\CommandProvider' => 'szeidler\ComposerDrupalUnused\Composer\CommandProvider',
-    ];
-  }
+    /**
+     * {@inheritdoc}
+     */
+    public function getCapabilities()
+    {
+        return [
+            'Composer\Plugin\Capability\CommandProvider' => 'szeidler\ComposerDrupalUnused\Composer\CommandProvider',
+        ];
+    }
 }

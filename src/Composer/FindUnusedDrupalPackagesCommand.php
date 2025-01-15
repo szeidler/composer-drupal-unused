@@ -3,107 +3,99 @@
 namespace szeidler\ComposerDrupalUnused\Composer;
 
 use Composer\Command\BaseCommand;
-use Composer\Package\CompletePackageInterface;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
-use Symfony\Component\Yaml\Yaml;
+use szeidler\ComposerDrupalUnused\Helper\ComposerHandler;
+use szeidler\ComposerDrupalUnused\Helper\ConfigReader;
 
 class FindUnusedDrupalPackagesCommand extends BaseCommand
 {
-  protected function configure()
-  {
-    $this
-      ->setName('unused-drupal-packages')
-      ->setDescription('Returns a list of Drupal Composer Packages that are not installed in your Drupal installation.')
-      ->addOption(
-        'config-dir',
-        null,
-        InputOption::VALUE_OPTIONAL,
-        'The directory where configuration files are stored.',
-        'config/sync'
-      );
-  }
 
-  protected function execute(InputInterface $input, OutputInterface $output): int
-  {
-    $configDirectory = $input->getOption('config-dir');
+    /**
+     * The Drupal config reader.
+     *
+     * @var ConfigReader
+     */
+    private ConfigReader $configReader;
 
-    $output->writeln("<info>Using configuration directory: {$configDirectory}</info>");
+    /**
+     * The Composer handler.
+     *
+     * @var ComposerHandler
+     */
+    private ComposerHandler $composerHandler;
 
-    $coreExtensionsFile = $configDirectory . '/core.extension.yml';
-
-    if (!file_exists($coreExtensionsFile)) {
-      echo "Core extensions configuration file not found at {$coreExtensionsFile}.\n";
-      return 1;
+    /**
+     * Constructs a new FindUnusedDrupalPackagesCommand.
+     *
+     * @param ConfigReader $configReader
+     *   The Drupal config reader.
+     * @param ComposerHandler $composerHandler
+     *   The Composer handler.
+     */
+    public function __construct(ConfigReader $configReader, ComposerHandler $composerHandler)
+    {
+        parent::__construct();
+        $this->configReader = $configReader;
+        $this->composerHandler = $composerHandler;
     }
 
-    // Load core.extension.yml
-    $coreExtensions = Yaml::parseFile($coreExtensionsFile);
-    $enabledModules = $coreExtensions['module'] ?? [];
-
-    // Check config_split modules
-    $configSplitModules = $this->getConfigSplitModules($configDirectory);
-
-    // Combine modules from core.extension and config_split
-    $allEnabledModules = array_merge($enabledModules, $configSplitModules);
-
-    // Get installed Drupal modules via Composer API
-    $installedModules = $this->getInstalledDrupalModules();
-
-    // Find missing modules
-    $missingModules = array_diff($installedModules, array_keys($allEnabledModules));
-
-    if (!empty($missingModules)) {
-      echo "The following Drupal modules are not enabled in core.extension.yml or any config_split:\n";
-      foreach ($missingModules as $module) {
-        echo "- $module\n";
-      }
-    } else {
-      echo "All first-level Drupal modules are enabled.\n";
+    /**
+     * {@inheritdoc}
+     */
+    protected function configure()
+    {
+        $this
+            ->setName('unused-drupal-packages')
+            ->setDescription('Lists or removes unused Drupal Composer packages.')
+            ->addOption('config-dir', null, InputOption::VALUE_OPTIONAL, 'Configuration directory.', 'config/sync')
+            ->addOption('remove', null, InputOption::VALUE_NONE, 'Remove unused dependencies automatically.');
     }
 
-    return 0;
-  }
+    /**
+     * {@inheritdoc}
+     */
+    protected function execute(InputInterface $input, OutputInterface $output): int
+    {
+        $configDir = $input->getOption('config-dir');
+        $removeUnused = $input->getOption('remove');
 
-  private function getInstalledDrupalModules(): array
-  {
-    $composer = $this->requireComposer();
-    $installedRepo = $composer->getRepositoryManager()->getLocalRepository();
-    $modules = [];
+        $output->writeln("<info>Using configuration directory: {$configDir}</info>");
 
-    /** @var CompletePackageInterface $package */
-    foreach ($installedRepo->getPackages() as $package) {
-      if (strpos($package->getName(), 'drupal/') === 0 && $package->getType() === 'drupal-module') {
-        $moduleName = substr($package->getName(), 7); // Remove "drupal/" prefix
-        $modules[] = $moduleName;
-      }
-    }
+        try {
+            // Fetch enabled extensions from ConfigReader.
+            $enabledExtensions = $this->configReader->getAllEnabledExtensions($configDir);
 
-    return $modules;
-  }
+            // Fetch installed modules from ComposerService.
+            $installedDrupalPackages = $this->composerHandler->getInstalledDrupalPackages();
 
-  private function getConfigSplitModules(string $directory): array
-  {
-    $modules = [];
+            // Determine unused packages.
+            $unusedPackages = array_diff($installedDrupalPackages, $enabledExtensions);
 
-    if (!is_dir($directory)) {
-      echo "Configuration directory {$directory} not found.\n";
-      return $modules;
-    }
+            if (empty($unusedPackages)) {
+                $output->writeln("<info>All installed Drupal packages are in use.</info>");
+                return 0;
+            }
 
-    $files = glob($directory . '/config_split.config_split.*.yml');
+            // Display unused packages.
+            $output->writeln("<comment>Unused Drupal packages found:</comment>");
+            foreach ($unusedPackages as $module) {
+                $output->writeln("- {$module}");
+            }
 
-    foreach ($files as $file) {
-      $config = Yaml::parseFile($file);
+            // Handle auto-removal of unused packages.
+            if ($removeUnused) {
+                $output->writeln("<info>Attempting to remove unused packages…</info>");
+                foreach ($unusedPackages as $module) {
+                    $this->composerHandler->removePackage($module, $output);
+                }
+            }
 
-      if (isset($config['module'])) {
-        foreach (array_keys($config['module']) as $moduleName) {
-          $modules[$moduleName] = true;
+            return 0;
+        } catch (\Exception $e) {
+            $output->writeln("<error>Error: {$e->getMessage()}</error>");
+            return 1;
         }
-      }
     }
-
-    return $modules;
-  }
 }
