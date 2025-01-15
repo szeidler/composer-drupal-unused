@@ -1,0 +1,3 @@
+module:
+  devel: 1
+  debug_toolbar: 1

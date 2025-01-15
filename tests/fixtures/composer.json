@@ -1,0 +1,7 @@
+{
+    "require": {
+        "drupal/views": "^1.0",
+        "drupal/devel": "^1.0",
+        "drupal/debug_toolbar": "^1.0"
+    }
+}
