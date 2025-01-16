@@ -87,9 +87,7 @@ class FindUnusedDrupalPackagesCommand extends BaseCommand
             // Handle auto-removal of unused packages.
             if ($removeUnused) {
                 $output->writeln("<info>Attempting to remove unused packages…</info>");
-                foreach ($unusedPackages as $module) {
-                    $this->composerHandler->removePackage($module, $output);
-                }
+                $this->composerHandler->removePackages($unusedPackages, $output);
             }
 
             return 0;

@@ -25,18 +25,13 @@ class FindUnusedDrupalPackagesCommandTest extends TestCase
      */
     private ComposerHandler $composerHandler;
 
+    /**
+     * {@inheritdoc}
+     */
     protected function setUp(): void
     {
         // Mock ComposerHandler.
         $this->composerHandler = $this->createMock(ComposerHandler::class);
-        $this->composerHandler
-            ->method('getInstalledDrupalPackages')
-            ->willReturn([
-                'views',
-                'devel',
-                'debug_toolbar',
-                'token', // Assume a package not present in the YAML files (unused).
-            ]);
 
         // Mock ConfigReader.
         $this->configReader = $this->createMock(ConfigReader::class);
@@ -52,11 +47,18 @@ class FindUnusedDrupalPackagesCommandTest extends TestCase
 
     /**
      * Tests listing unused Drupal packages.
-     *
-     * @return void
      */
     public function testListsUnusedPackages()
     {
+        $this->composerHandler
+            ->method('getInstalledDrupalPackages')
+            ->willReturn([
+                'views',
+                'devel',
+                'debug_toolbar',
+                'token', // Assume a package not present in the YAML files (unused).
+            ]);
+
         $command = new FindUnusedDrupalPackagesCommand($this->configReader, $this->composerHandler);
 
         // Create a console input and output for the test.
@@ -83,35 +85,132 @@ class FindUnusedDrupalPackagesCommandTest extends TestCase
     }
 
     /**
-     * Tests removing unused Drupal packages.
+     * Test when all installed packages are in use.
      */
-    public function testRemovesUnusedPackages()
+    public function testNoUnusedPackages()
     {
-        // Mock the removePackage method to simulate the output.
         $this->composerHandler
-            ->expects($this->once()) // Ensure removePackage is called once.
-            ->method('removePackage')
-            ->with('token') // Ensure only 'token' is passed for removal.
-            ->willReturnCallback(function ($moduleName, $output) {
-                // Simulate writing to the output.
-                $output->writeln("Removing package: drupal/{$moduleName}");
-            });
+            ->method('getInstalledDrupalPackages')
+            ->willReturn(['views', 'devel', 'debug_toolbar']); // All packages are in use.
 
         $command = new FindUnusedDrupalPackagesCommand($this->configReader, $this->composerHandler);
 
         $input = new ArrayInput([
             '--config-dir' => 'tests/fixtures',
-            '--remove' => true, // Include the --remove flag.
         ]);
         $output = new BufferedOutput();
 
         $exitCode = $command->run($input, $output);
 
         $this->assertSame(0, $exitCode);
-        $content = $output->fetch();
 
+        $content = $output->fetch();
+        $this->assertStringContainsString('All installed Drupal packages are in use.', $content);
+        $this->assertStringNotContainsString('Unused Drupal packages found:', $content);
+    }
+
+
+    /**
+     * Tests the removal of unused Drupal packages.
+     */
+    public function testRemovesUnusedPackages()
+    {
+        $this->composerHandler
+            ->method('getInstalledDrupalPackages')
+            ->willReturn([
+                'views',
+                'devel',
+                'debug_toolbar',
+                'token', // Assume a package not present in the YAML files (unused).
+            ]);
+
+        $this->composerHandler
+            ->expects($this->once())
+            ->method('removePackages')
+            ->with([3 => 'token']); // Expect only the unused package 'token' to be passed.
+
+        // Create the command with mocked dependencies.
+        $command = new FindUnusedDrupalPackagesCommand($this->configReader, $this->composerHandler);
+
+        // Create a console input and output for the test.
+        $input = new ArrayInput([
+            '--config-dir' => 'tests/fixtures', // Use test fixtures.
+            '--remove' => true, // Indicate removal should occur.
+        ]);
+        $output = new BufferedOutput();
+
+        // Execute the command.
+        $exitCode = $command->run($input, $output);
+
+        // Assert exit code.
+        $this->assertSame(0, $exitCode);
+
+        // Fetch the output and validate that unused packages were identified.
+        $content = $output->fetch();
+        $this->assertStringContainsString('Unused Drupal packages found:', $content);
+        $this->assertStringContainsString('- token', $content);
         $this->assertStringContainsString('Attempting to remove unused packages…', $content);
-        $this->assertStringContainsString('Removing package: drupal/token',
-            $content); // Ensure the expected string is present.
+
+        // Validate that used modules are not listed for removal.
+        $this->assertStringNotContainsString('- views', $content);
+        $this->assertStringNotContainsString('- devel', $content);
+        $this->assertStringNotContainsString('- debug_toolbar', $content);
+    }
+
+    /**
+     * Test invalid config directory.
+     */
+    public function testInvalidConfigDirectory()
+    {
+        $this->configReader
+            ->method('getAllEnabledExtensions')
+            ->willThrowException(new \RuntimeException('Invalid config directory.'));
+
+        $command = new FindUnusedDrupalPackagesCommand($this->configReader, $this->composerHandler);
+
+        $input = new ArrayInput([
+            '--config-dir' => 'invalid/directory',
+        ]);
+        $output = new BufferedOutput();
+
+        $exitCode = $command->run($input, $output);
+
+        $this->assertSame(1, $exitCode);
+
+        $content = $output->fetch();
+        $this->assertStringContainsString('Error: Invalid config directory.', $content);
+    }
+
+    /**
+     * Test removal of packages not triggered without passing the `--remove` option.
+     */
+    public function testDoesNotRemoveWithoutFlag()
+    {
+        $this->composerHandler
+            ->method('getInstalledDrupalPackages')
+            ->willReturn([
+                'views',
+                'devel',
+                'debug_toolbar',
+                'token', // Assume a package not present in the YAML files (unused).
+            ]);
+
+        $this->composerHandler
+            ->expects($this->never())
+            ->method('removePackages');
+
+        $command = new FindUnusedDrupalPackagesCommand($this->configReader, $this->composerHandler);
+
+        $input = new ArrayInput([
+            '--config-dir' => 'tests/fixtures',
+        ]);
+        $output = new BufferedOutput();
+
+        $exitCode = $command->run($input, $output);
+
+        $this->assertSame(0, $exitCode);
+
+        $content = $output->fetch();
+        $this->assertStringContainsString('Unused Drupal packages found:', $content);
     }
 }

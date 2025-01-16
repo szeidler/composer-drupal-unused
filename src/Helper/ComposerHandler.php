@@ -67,51 +67,59 @@ class ComposerHandler
     }
 
     /**
-     * Remove a specific Drupal package.
+     * Remove multiple Drupal packages.
      *
-     * @param string $moduleName
-     *   Name of the Drupal module (without 'drupal/' prefix)
+     * @param array $moduleNames
+     *   Array of module names (without 'drupal/' prefix).
      * @param OutputInterface $output
-     *   Console output interface
+     *   Console output interface.
      */
-    public function removePackage(string $moduleName, OutputInterface $output): void
+    public function removePackages(array $moduleNames, OutputInterface $output): void
     {
-        $packageName = "drupal/{$moduleName}";
+        $packageNames = array_map(fn($name) => "drupal/{$name}", $moduleNames);
 
         try {
-            $output->writeln("<info>Removing package: {$packageName}</info>");
+            $output->writeln("<info>Removing packages: " . implode(', ', $packageNames) . "</info>");
 
-            // Check if the module exists in composer.json dependencies
+            // Get root package requirements.
             $rootPackage = $this->composer->getPackage();
             $requires = $rootPackage->getRequires();
+            $devRequires = $rootPackage->getDevRequires();
 
-            if (!array_key_exists($packageName, $requires)) {
-                $output->writeln("<comment>Package {$packageName} is not found in composer.json requirements.</comment>");
-                return;
+            // Remove each package from `require` or `require-dev`.
+            foreach ($packageNames as $packageName) {
+                if (array_key_exists($packageName, $requires)) {
+                    unset($requires[$packageName]);
+                }
+                if (array_key_exists($packageName, $devRequires)) {
+                    unset($devRequires[$packageName]);
+                }
             }
 
-            // Remove the package from dependencies
-            unset($requires[$packageName]);
             $rootPackage->setRequires($requires);
+            $rootPackage->setDevRequires($devRequires);
 
-            // Update composer.json using an internal helper method
+            // Update composer.json using an internal helper method.
             $this->writeComposerJson($rootPackage);
 
-            // Run the Composer installer to remove the module
+            // Run the Composer installer to remove specified packages.
             $installer = Installer::create($this->io, $this->composer);
             $installer->setUpdate(true)
-                ->setUpdateAllowList([$packageName]) // Restrict updates to the package being removed
-                ->setDevMode(true);
+                ->setDevMode(true) // Important to handle dev dependencies correctly.
+                ->setUpdateAllowList($packageNames); // Remove only specified packages.
 
             $status = $installer->run();
 
             if ($status !== 0) {
-                $output->writeln("<error>Failed to remove package: {$packageName}</error>");
+                $output->writeln("<error>Failed to remove packages: " . implode(', ', $packageNames) . "</error>");
             } else {
-                $output->writeln("<info>Successfully removed package: {$packageName}</info>");
+                $output->writeln("<info>Successfully removed packages: " . implode(', ', $packageNames) . "</info>");
             }
         } catch (\Exception $e) {
-            $output->writeln("<error>Error removing package {$packageName}: {$e->getMessage()}</error>");
+            $output->writeln("<error>Error removing packages: " . implode(
+                ', ',
+                $packageNames
+            ) . ". {$e->getMessage()}</error>");
         }
     }
 
