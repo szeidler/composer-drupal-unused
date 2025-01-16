@@ -5,7 +5,7 @@ on:
   pull_request: # Run tests when a pull request is created or updated
 
 jobs:
-  phpunit:
+  test:
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -26,6 +26,10 @@ jobs:
       # Install dependencies
       - name: Install dependencies
         run: composer install --prefer-dist --no-progress --no-suggest
+
+      # Run PHP CodeSniffer (phpcs)
+      - name: Run PHP_CodeSniffer
+        run: vendor/bin/phpcs
 
       # Run PHPUnit tests
       - name: Run PHPUnit tests
